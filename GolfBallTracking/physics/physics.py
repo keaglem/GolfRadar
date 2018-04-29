@@ -23,7 +23,7 @@ def calculate_air_resistance(drag_coefficient, air_density, surface_area, veloci
     :return: air_resistance
     """
 
-    air_resistance = .5 * drag_coefficient * air_density * surface_area * velocity ** 2
+    air_resistance = .5 * drag_coefficient * air_density * surface_area * numpy.squeeze(velocity) ** 2
 
     return air_resistance
 
