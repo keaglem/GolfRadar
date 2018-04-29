@@ -122,7 +122,7 @@ def set_axes_equal(ax):
     cubes as cubes, etc..  This is one possible solution to Matplotlib's
     ax.set_aspect('equal') and ax.axis('equal') not working for 3D.
 
-    Inumpyut
+    Input
       ax: a matplotlib axis, e.g., as output from plt.gca().
     '''
 
@@ -218,5 +218,7 @@ def test_ball_flight():
     pyplot.ylabel('In/Out')
     set_axes_equal(ax)
     ax.set_zlabel('Up/Down')
+    ax.plot(filtered_ball_position[0, :],
+            filtered_ball_position[2, :], 'g--')
 
     pyplot.show()
