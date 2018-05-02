@@ -1,10 +1,11 @@
 import numpy
 import scipy
 import matplotlib
-from physics import physics
+from GolfBallTracking.physics import physics
 from matplotlib import pyplot
 
 # In this package, x is right (aft looking forward), y is up, and z is out
+
 
 def plot_position_vector(position_vector):
     filtered_ball_position = position_vector[:, position_vector[1, :] > 0]
@@ -24,6 +25,40 @@ def plot_position_vector(position_vector):
             filtered_ball_position[2, :], 'g--')
 
     pyplot.show()
+
+
+def plot_all_vectors(time_vector,
+                     position_vector,
+                     velocity_vector):
+
+    filtered_ball_position = position_vector[:, position_vector[1, :] > 0]
+    filtered_ball_velocity = velocity_vector[:, position_vector[1, :] > 0]
+    filtered_time = time_vector[position_vector[1, :] > 0]
+    fig = pyplot.figure()
+    ax = fig.add_subplot(121)
+
+    ax.plot(filtered_time, filtered_ball_position[0, :], 'r', label='x')
+    ax.plot(filtered_time, filtered_ball_position[1, :], 'b', label='y')
+    ax.plot(filtered_time, filtered_ball_position[2, :], 'g', label='z')
+
+    pyplot.grid()
+    pyplot.xlabel('Time')
+    pyplot.ylabel('Position (m)')
+    pyplot.title('Position')
+    pyplot.legend()
+
+    ax = fig.add_subplot(122)
+    ax.plot(filtered_time, filtered_ball_velocity[0, :], 'r', label='x')
+    ax.plot(filtered_time, filtered_ball_velocity[1, :], 'b', label='y')
+    ax.plot(filtered_time, filtered_ball_velocity[2, :], 'g', label='z')
+
+    pyplot.grid()
+    pyplot.xlabel('Time')
+    pyplot.ylabel('Velocity (m/s)')
+    pyplot.title('Velocity')
+
+    pyplot.show()
+
 
 class PositionObject:
 
@@ -149,33 +184,7 @@ class GolfBall (Target):
         print(self.position)
 
 
-speed_of_light = 2.99875e8
-frequency_radiated = 16.0e9
-lambda_radiated = speed_of_light / frequency_radiated
-collector = Collector()
-target = GolfBall(numpy.array([[0.0, 20, 50]]).T,
-                  numpy.array([[0.0, 0, 50]]).T)
 
-distance_between_positions = numpy.sqrt(numpy.sum(numpy.square(target.position) - numpy.square(collector.position)))
-phase_for_distance = 4 * numpy.pi * distance_between_positions / lambda_radiated
-
-time_to_analyze = numpy.arange(0, 10, .001)
-time_deltas = numpy.diff(time_to_analyze)
-
-total_position = numpy.empty((3,len(time_to_analyze)))
-total_position[:, 0] = target.position[0, :]
-
-total_velocity = numpy.empty((3,len(time_to_analyze)))
-total_velocity[:, 0] = target.velocity[0, :]
-
-for idx, diffs in enumerate(time_deltas):
-
-    target.propagate_position(diffs)
-    total_position[:, idx] = target.position[:, 0]
-
-plot_position_vector(total_position)
-
-test=1
 
 
 
@@ -189,4 +198,41 @@ if __name__ == '__main__':
 
     print('Hello world')
 
+    speed_of_light = 2.99875e8
+    frequency_radiated = 16.0e9
+    lambda_radiated = speed_of_light / frequency_radiated
+    collector = Collector()
+    target = GolfBall(numpy.array([[0.0, 20, 50]]).T,
+                      numpy.array([[0.0, 0, 50]]).T)
 
+    distance_between_positions = numpy.sqrt(numpy.sum(numpy.square(target.position) - numpy.square(collector.position)))
+    phase_for_distance = 4 * numpy.pi * distance_between_positions / lambda_radiated
+
+    time_to_analyze = numpy.arange(0, 10, .001)
+    time_deltas = numpy.diff(time_to_analyze)
+
+    total_position = numpy.empty((3,len(time_to_analyze)))
+    total_position[:, 0] = target.position[0, :]
+
+    total_velocity = numpy.empty((3,len(time_to_analyze)))
+    total_velocity[:, 0] = target.velocity[0, :]
+
+    for idx, diffs in enumerate(time_deltas):
+
+        target.propagate_position(diffs)
+        total_position[:, idx] = target.position[:, 0]
+        total_velocity[:, idx] = target.velocity[:, 0]
+
+        distance_between_positions = numpy.sqrt(
+            numpy.sum(numpy.square(target.position) - numpy.square(collector.position)))
+
+        round_trip_time = 2 * distance_between_positions / speed_of_light
+        prf_hz = 1 / round_trip_time
+
+
+
+    plot_position_vector(total_position)
+    plot_all_vectors(time_to_analyze,
+                     total_position,
+                     total_velocity)
+    test=1
