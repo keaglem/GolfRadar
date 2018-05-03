@@ -1,5 +1,5 @@
 import numpy
-import scipy
+from scipy import signal
 import matplotlib
 from GolfBallTracking.physics import physics
 from matplotlib import pyplot
@@ -199,7 +199,7 @@ if __name__ == '__main__':
     print('Hello world')
 
     speed_of_light = 2.99875e8
-    frequency_radiated = 16.0e9
+    frequency_radiated = 2.0e9
     lambda_radiated = speed_of_light / frequency_radiated
     collector = Collector()
     target = GolfBall(numpy.array([[0.0, 20, 50]]).T,
@@ -208,7 +208,9 @@ if __name__ == '__main__':
     distance_between_positions = numpy.sqrt(numpy.sum(numpy.square(target.position) - numpy.square(collector.position)))
     phase_for_distance = 4 * numpy.pi * distance_between_positions / lambda_radiated
 
-    time_to_analyze = numpy.arange(0, 10, .001)
+    sampling_period = .0001
+
+    time_to_analyze = numpy.arange(0, 1, sampling_period)
     time_deltas = numpy.diff(time_to_analyze)
 
     total_position = numpy.empty((3,len(time_to_analyze)))
@@ -217,19 +219,36 @@ if __name__ == '__main__':
     total_velocity = numpy.empty((3,len(time_to_analyze)))
     total_velocity[:, 0] = target.velocity[0, :]
 
+    signal_return = numpy.zeros(time_to_analyze.shape, dtype=complex)
+
     for idx, diffs in enumerate(time_deltas):
 
         target.propagate_position(diffs)
         total_position[:, idx] = target.position[:, 0]
         total_velocity[:, idx] = target.velocity[:, 0]
 
-        distance_between_positions = numpy.sqrt(
-            numpy.sum(numpy.square(target.position) - numpy.square(collector.position)))
+        distance_between_positions = numpy.sqrt(numpy.sum(numpy.square(target.position) -
+                                                          numpy.square(collector.position)))
 
         round_trip_time = 2 * distance_between_positions / speed_of_light
+        phase_for_target = - 2 * numpy.pi * round_trip_time * frequency_radiated
+
+        signal_return[idx] = 1 * numpy.exp(1j * phase_for_target)
+
         prf_hz = 1 / round_trip_time
 
 
+    pyplot.figure()
+    signal.spectrogram(signal_return)
+    f, t, Sxx = signal.spectrogram(signal_return, 1. / sampling_period)
+    pyplot.pcolormesh(t, f, numpy.log10(numpy.abs(Sxx)))
+    pyplot.ylabel('Frequency [Hz]')
+    pyplot.xlabel('Time [sec]')
+
+    pyplot.figure()
+    pyplot.plot(numpy.linspace(-1/sampling_period/2, 1/sampling_period/2, 2048), 10*numpy.log10(numpy.abs(numpy.fft.fft(signal_return[0:2048]))))
+    pyplot.grid()
+    pyplot.axis('tight')
 
     plot_position_vector(total_position)
     plot_all_vectors(time_to_analyze,
