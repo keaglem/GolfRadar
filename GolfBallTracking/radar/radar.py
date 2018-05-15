@@ -125,11 +125,11 @@ class GolfBall (Target):
     def __init__(self,
                  position=numpy.zeros((3, 1)),
                  velocity=numpy.zeros((3, 1)),
+                 spin=numpy.zeros((3, 1)),
                  acceleration=numpy.zeros((3, 1)),
                  initial_time=0,
                  time_delta=Target.TIME_DELTA,
-                 rcs_dBsm=0,
-                 spin=numpy.zeros((3,1))):
+                 rcs_dBsm=0):
 
         super().__init__(position,
                          velocity,
@@ -141,10 +141,10 @@ class GolfBall (Target):
         self.spin = spin
 
         self.length = .042  # meters
-        self.surface_area = 4 * numpy.pi * (self.length / 2) ** 2
+        self.surface_area = numpy.pi * (self.length / 2) ** 2
         self.ball_mass = .0433  # kg
         self.magnus_coefficient = .17
-        self.drag_coefficient = .2  #
+        self.drag_coefficient = .15  #
 
         # Needs to be moved to an environment class
         self.temperature = 21.  # celsius
@@ -168,8 +168,8 @@ class GolfBall (Target):
                                                       self.surface_area,
                                                       self.velocity)
 
-        resistance = air_resistance + magnus_force + physics.calculate_gravity(self.mass)
-        total_acceleration = resistance / self.mass
+        resistance = air_resistance + magnus_force + physics.calculate_gravity(self.ball_mass)
+        total_acceleration = resistance / self.ball_mass
 
         self.velocity[:, 0] += total_acceleration * delta_time
         self.position[:, 0] += self.velocity[:, 0] * delta_time
@@ -202,15 +202,18 @@ if __name__ == '__main__':
     frequency_radiated = 2.0e9
     lambda_radiated = speed_of_light / frequency_radiated
     collector = Collector()
-    target = GolfBall(numpy.array([[0.0, 20, 50]]).T,
-                      numpy.array([[0.0, 0, 50]]).T)
+    launch_angle = 15 * numpy.pi / 180.
+    launch_speed = 75
+    target = GolfBall(numpy.array([[0.0, 0, 0]]).T,
+                      numpy.array([[0.0, launch_speed*numpy.sin(launch_angle), launch_speed*numpy.cos(launch_angle)]]).T,
+                      numpy.array([[-1, 0, 0]]).T)
 
     distance_between_positions = numpy.sqrt(numpy.sum(numpy.square(target.position) - numpy.square(collector.position)))
     phase_for_distance = 4 * numpy.pi * distance_between_positions / lambda_radiated
 
-    sampling_period = .0001
+    sampling_period = .001
 
-    time_to_analyze = numpy.arange(0, 1, sampling_period)
+    time_to_analyze = numpy.arange(0, 10, sampling_period)
     time_deltas = numpy.diff(time_to_analyze)
 
     total_position = numpy.empty((3,len(time_to_analyze)))
@@ -241,9 +244,17 @@ if __name__ == '__main__':
     pyplot.figure()
     signal.spectrogram(signal_return)
     f, t, Sxx = signal.spectrogram(signal_return, 1. / sampling_period)
-    pyplot.pcolormesh(t, f, numpy.log10(numpy.abs(Sxx)))
-    pyplot.ylabel('Frequency [Hz]')
-    pyplot.xlabel('Time [sec]')
+    compressedSignal = 20*numpy.log10(numpy.abs(Sxx))
+    peakValue = numpy.max(compressedSignal, 0)
+    peakIdx = numpy.argmax(compressedSignal, 0)
+    f = numpy.fft.fftshift(f)
+    frequency_detected = f[peakIdx]
+
+    pyplot.pcolormesh(f, t, compressedSignal.T)
+    pyplot.plot(frequency_detected, t,'r*')
+    #pyplot.pcolormesh(t, f, compressedSignal)
+    pyplot.xlabel('Frequency [Hz]')
+    pyplot.ylabel('Time [sec]')
 
     pyplot.figure()
     pyplot.plot(numpy.linspace(-1/sampling_period/2, 1/sampling_period/2, 2048), 10*numpy.log10(numpy.abs(numpy.fft.fft(signal_return[0:2048]))))
@@ -255,3 +266,4 @@ if __name__ == '__main__':
                      total_position,
                      total_velocity)
     test=1
+    pyplot.show()

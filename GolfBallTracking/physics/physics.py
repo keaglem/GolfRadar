@@ -22,8 +22,10 @@ def calculate_air_resistance(drag_coefficient, air_density, surface_area, veloci
     :param velocity:
     :return: air_resistance
     """
+    velocity_total = numpy.dot(numpy.squeeze(velocity), numpy.squeeze(velocity))
+    cross_velocity = velocity / numpy.linalg.norm( velocity )
 
-    air_resistance = .5 * drag_coefficient * air_density * surface_area * numpy.squeeze(velocity) ** 2
+    air_resistance = .5 * drag_coefficient * air_density * surface_area * velocity_total * numpy.squeeze(cross_velocity)
 
     return air_resistance
 
@@ -44,8 +46,11 @@ def calculate_magnus_force(magnus_coefficient, angular_velocity, air_density, su
     sidespin = velocity.copy()
     sidespin[2]=0
 
-    magnus_force = .5 * magnus_coefficient * air_density * surface_area * numpy.cross(numpy.array([1,0,0]), backspin.squeeze() ) ** 2
-    magnus_force += .5 * magnus_coefficient * air_density * surface_area * numpy.cross(numpy.array([0,-1,0]), sidespin.squeeze() ) ** 2
+    cross_velocity = numpy.cross(angular_velocity.squeeze(), velocity.squeeze())
+    velocity_total = numpy.dot(velocity.squeeze(), velocity.squeeze())
+    cross_velocity = cross_velocity / numpy.linalg.norm( cross_velocity )
+
+    magnus_force = .5 * magnus_coefficient * air_density * surface_area * velocity_total * cross_velocity
 
     return magnus_force
 
@@ -151,9 +156,9 @@ def test_ball_flight():
     test_drag_coefficient = .2  #
     test_magnus_coefficient = .17
     test_exit_speed = 67  # m/s
-    test_spin = numpy.array([[0,
+    test_spin = numpy.array([[-150,
                               0,
-                              -150]]).T  # rad/s
+                              0]]).T  # rad/s
     test_exit_launch_angle = 20 * numpy.pi / 180.0
     test_velocity = numpy.array([[0,
                                   test_exit_speed*numpy.sin(test_exit_launch_angle),
