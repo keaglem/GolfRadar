@@ -1,7 +1,7 @@
 import numpy
 from scipy import signal
 import matplotlib
-from GolfBallTracking.physics import physics
+from physics import physics
 from matplotlib import pyplot
 
 # In this package, x is right (aft looking forward), y is up, and z is out
@@ -22,12 +22,31 @@ def signal_to_noise(range_to_target,
     gain_rx = gain_tx
     processing_gain = 1
     kT0 = (1.381e-23 * 290)
-    noise_bandwidth = 1 / sample_rate
-    noise_figure = 5
-    signal_to_noise_measured = power_output * gain_tx * gain_rx * lambda_array ** 2 * rcs_target * processing_gain \
-                      / (numpy.power(4 * numpy.pi, 3) * numpy.power(range_to_target, 4) * kT0 * noise_figure * noise_bandwidth)
+    noise_bandwidth = sample_rate
 
-    return signal_to_noise_measured
+    power_dB = 10*numpy.log10(power_output)
+    gain_2way_dB = 10*numpy.log10(gain_tx * gain_rx)
+    lambda_sqr_dB = 10*numpy.log10( lambda_array ** 2 )
+    rcs_dBsm = 10*numpy.log10(rcs_target)
+    processing_gain_dB = 10*numpy.log10(processing_gain)
+    four_pi3_dB = 10*numpy.log10(numpy.power(4 * numpy.pi, 3))
+    range_dB = 40*numpy.log10(range_to_target)
+    kT0_dB = 10*numpy.log10(kT0)
+    noise_figure = 6
+    noise_bandwidth_dB = 10*numpy.log10(noise_bandwidth)
+
+    signal_to_noise_measured_dB = power_dB + \
+                               gain_2way_dB + \
+                               lambda_sqr_dB + \
+                               rcs_dBsm + \
+                               processing_gain_dB - \
+                               four_pi3_dB - \
+                               range_dB - \
+                               kT0_dB - \
+                               noise_figure - \
+                               noise_bandwidth_dB
+
+    return signal_to_noise_measured_dB
 
 
 def plot_position_vector(position_vector):
@@ -46,8 +65,6 @@ def plot_position_vector(position_vector):
     ax.set_zlabel('Up/Down')
     ax.plot(filtered_ball_position[0, :],
             filtered_ball_position[2, :], 'g--')
-
-    pyplot.show()
 
 
 def plot_all_vectors(time_vector,
@@ -79,8 +96,6 @@ def plot_all_vectors(time_vector,
     pyplot.xlabel('Time')
     pyplot.ylabel('Velocity (m/s)')
     pyplot.title('Velocity')
-
-    pyplot.show()
 
 
 class PositionObject:
@@ -206,6 +221,10 @@ class GolfBall (Target):
 
         print(self.position)
 
+    def get_rcs(self):
+
+        return numpy.pi * (self.length / 2) ** 2
+
 
 # Notes on ball flight:
 #  Normal vector will be mostly perpendicular to initial velocity vector
@@ -231,7 +250,7 @@ if __name__ == '__main__':
     distance_between_positions = numpy.sqrt(numpy.sum(numpy.square(target.position) - numpy.square(collector.position)))
     phase_for_distance = 4 * numpy.pi * distance_between_positions / lambda_radiated
 
-    sampling_period = .0005
+    sampling_period = .00005
 
     time_to_analyze = numpy.arange(0, 20, sampling_period)
     time_deltas = numpy.diff(time_to_analyze)
@@ -243,6 +262,7 @@ if __name__ == '__main__':
     total_velocity[:, 0] = target.velocity[0, :]
 
     signal_return = numpy.zeros(time_to_analyze.shape, dtype=complex)
+    signal_to_noise_measured = numpy.zeros(time_to_analyze.shape)
 
     for idx, diffs in enumerate(time_deltas):
 
@@ -256,7 +276,13 @@ if __name__ == '__main__':
         round_trip_time = 2 * distance_between_positions / speed_of_light
         phase_for_target = - 2 * numpy.pi * round_trip_time * frequency_radiated
 
-        signal_return[idx] = 1 * numpy.exp(1j * phase_for_target)
+        signal_to_noise_measured[idx] = signal_to_noise(distance_between_positions,
+                                                        lambda_radiated,
+                                                        target.get_rcs(),
+                                                        1/sampling_period)
+
+        signal_return[idx] = numpy.power(10, signal_to_noise_measured[idx]/20) * numpy.exp(1j * phase_for_target)
+        signal_return[idx] += (numpy.random.randn(1) + 1j*numpy.random.randn(1)) / numpy.sqrt(numpy.pi/2)
 
         prf_hz = 1 / round_trip_time
 
@@ -271,18 +297,28 @@ if __name__ == '__main__':
     frequency_detected = f[peakIdx]
 
     pyplot.pcolormesh(f, t, compressedSignal.T)
-    pyplot.plot(frequency_detected, t,'r*')
-    #pyplot.pcolormesh(t, f, compressedSignal)
+    pyplot.plot(frequency_detected, t, 'r*', alpha=.5)
     pyplot.xlabel('Frequency [Hz]')
     pyplot.ylabel('Time [sec]')
 
-    pyplot.figure()
-    pyplot.plot(numpy.linspace(-1/sampling_period/2,
-                               1/sampling_period/2,
-                               2048),
-                10*numpy.log10(numpy.abs(numpy.fft.fft(signal_return[0:2048]))))
+    fig1, axshare = pyplot.subplots()
+    axshare.plot(t, frequency_detected, label='Detected frequency', color='b')
+    axshare.set_ylabel('Frequency (Hz)')
+    ax2 = axshare.twinx()
+    ax2.plot(time_to_analyze, signal_to_noise_measured, label='Signal to noise', color='r')
+    ax2.set_ylabel('SNR(dB)')
     pyplot.grid()
-    pyplot.axis('tight')
+    axshare.set_xlabel('Time(sec)')
+    axshare.axis('tight')
+    axshare.legend()
+    ax2.legend()
+
+    pyplot.figure()
+    pyplot.plot(time_to_analyze, 20*numpy.log10(signal_return), 'r+', label='Measured SNR', alpha=.5)
+    pyplot.plot(time_to_analyze, signal_to_noise_measured, 'b', label='Signal to noise')
+    pyplot.xlabel('Time (sec)')
+    pyplot.ylabel('SNR (dB)')
+    pyplot.grid()
 
     plot_position_vector(total_position)
     plot_all_vectors(time_to_analyze,
