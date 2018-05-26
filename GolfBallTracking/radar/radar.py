@@ -7,6 +7,29 @@ from matplotlib import pyplot
 # In this package, x is right (aft looking forward), y is up, and z is out
 
 
+def signal_to_noise(range_to_target,
+                    lambda_radiated,
+                    rcs_target,
+                    sample_rate):
+
+    power_output = .001  # W
+    width_array = .3  # m
+    height_array = .3  # m
+    area_array = width_array * height_array
+    taper_array = 1
+    lambda_array = lambda_radiated
+    gain_tx = 4 * numpy.pi * area_array * taper_array / lambda_array ** 2
+    gain_rx = gain_tx
+    processing_gain = 1
+    kT0 = (1.381e-23 * 290)
+    noise_bandwidth = 1 / sample_rate
+    noise_figure = 5
+    signal_to_noise_measured = power_output * gain_tx * gain_rx * lambda_array ** 2 * rcs_target * processing_gain \
+                      / (numpy.power(4 * numpy.pi, 3) * numpy.power(range_to_target, 4) * kT0 * noise_figure * noise_bandwidth)
+
+    return signal_to_noise_measured
+
+
 def plot_position_vector(position_vector):
     filtered_ball_position = position_vector[:, position_vector[1, :] > 0]
     fig = pyplot.figure()
@@ -143,8 +166,8 @@ class GolfBall (Target):
         self.length = .042  # meters
         self.surface_area = numpy.pi * (self.length / 2) ** 2
         self.ball_mass = .0433  # kg
-        self.magnus_coefficient = .17
-        self.drag_coefficient = .15  #
+        self.magnus_coefficient = 0.4
+        self.drag_coefficient = 0.25  #
 
         # Needs to be moved to an environment class
         self.temperature = 21.  # celsius
@@ -184,26 +207,23 @@ class GolfBall (Target):
         print(self.position)
 
 
-
-
-
-
 # Notes on ball flight:
 #  Normal vector will be mostly perpendicular to initial velocity vector
 
 def test_propogate_position():
     test=1
 
+
 if __name__ == '__main__':
 
     print('Hello world')
 
     speed_of_light = 2.99875e8
-    frequency_radiated = 2.0e9
+    frequency_radiated = 4e9
     lambda_radiated = speed_of_light / frequency_radiated
     collector = Collector()
-    launch_angle = 15 * numpy.pi / 180.
-    launch_speed = 75
+    launch_angle = 10 * numpy.pi / 180.
+    launch_speed = 70
     target = GolfBall(numpy.array([[0.0, 0, 0]]).T,
                       numpy.array([[0.0, launch_speed*numpy.sin(launch_angle), launch_speed*numpy.cos(launch_angle)]]).T,
                       numpy.array([[-1, 0, 0]]).T)
@@ -211,9 +231,9 @@ if __name__ == '__main__':
     distance_between_positions = numpy.sqrt(numpy.sum(numpy.square(target.position) - numpy.square(collector.position)))
     phase_for_distance = 4 * numpy.pi * distance_between_positions / lambda_radiated
 
-    sampling_period = .001
+    sampling_period = .0005
 
-    time_to_analyze = numpy.arange(0, 10, sampling_period)
+    time_to_analyze = numpy.arange(0, 20, sampling_period)
     time_deltas = numpy.diff(time_to_analyze)
 
     total_position = numpy.empty((3,len(time_to_analyze)))
@@ -257,7 +277,10 @@ if __name__ == '__main__':
     pyplot.ylabel('Time [sec]')
 
     pyplot.figure()
-    pyplot.plot(numpy.linspace(-1/sampling_period/2, 1/sampling_period/2, 2048), 10*numpy.log10(numpy.abs(numpy.fft.fft(signal_return[0:2048]))))
+    pyplot.plot(numpy.linspace(-1/sampling_period/2,
+                               1/sampling_period/2,
+                               2048),
+                10*numpy.log10(numpy.abs(numpy.fft.fft(signal_return[0:2048]))))
     pyplot.grid()
     pyplot.axis('tight')
 
@@ -265,5 +288,4 @@ if __name__ == '__main__':
     plot_all_vectors(time_to_analyze,
                      total_position,
                      total_velocity)
-    test=1
     pyplot.show()
